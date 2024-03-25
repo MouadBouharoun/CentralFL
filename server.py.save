@@ -1,0 +1,102 @@
+import socket
+import pickle
+import os
+import time
+
+def server_model(W, b, dW, db):
+    W, b = update(dW, db, W, b, learning_rate = 0.01)
+    return (W, b)
+def euclidean_distance(v1, v2):
+    return np.linalg.norm(np.array(v1) - np.array(v2))
+def k_neighbors(v, V, k):
+    n = len(V)
+    neighbors = []
+    for vector in V:
+        x_v = random.uniform(0, 0.0001)
+        distance = euclidean_distance(v, vector) + x_v
+        heapq.heappush(neighbors, (distance, vector))
+
+    k_nearest = heapq.nsmallest(k, neighbors)
+    #k_nearest_vectors = [vector for vector in V if euclidean_distance(v, vector) in k_nearest_distances]
+    k_nearest_vectors = [vector for _, vector in k_nearest]
+    return k_nearest_vectors
+def s(v, V, f):
+    n = len(V)
+    sum = 0
+    n_f_2_neighbors = k_neighbors(v, V, n-f-2)
+    for vector in n_f_2_neighbors:
+        sum += euclidean_distance(v, vector)
+    return sum
+def krum(V, f):
+    n = len(V)
+    S = []
+    for v in V:
+       s_v = s(v, V, f)
+       S += [s_v]
+    return min(S)
+
+def aggregation_function(client1_model, client2_model, client3_model, client4_model, client5_model):
+    aggregated_model = {}
+    for key in client1_model.keys():
+        aggregated_model[key] = (client1_model[key] + client2_model[key] + client3_model[key] + client4_model[key] + client5_model[key]) / 5
+    return aggregated_model
+def main():
+    server_conf = ('localhost', 12345)
+    client1_conf = ('localhost', 12346)
+    client2_conf = ('localhost', 12347)
+    client3_conf = ('localhost', 12348)
+    client4_conf = ('localhost', 12349)
+    client5_conf = ('localhost', 12350)
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server_socket.bind(server_conf)
+    print('starting up on %s port %s' % server_conf)
+    
+    rounds = 0
+    while rounds < 3:
+        x=0
+        while x<5:
+            print('\nwaiting to receive message')
+            data, address = server_socket.recvfrom(8192)
+        #data2, address2 = server_socket.recvfrom(8192)
+            if data:
+                if data[0]==0xAA:
+                    print('##')
+                    client1_model = pickle.loads(data[1:])
+                    print('#client 1 model#')
+                    print(client1_model)
+                if data[0]==0xBA:
+                    print('##')
+                    client2_model = pickle.loads(data[1:])
+                    print('#client 2 model#')
+                    print(client2_model)
+                if data[0]==0xCA:
+                    print('##')
+                    client3_model = pickle.loads(data[1:])
+                    print('#client 3 model#')
+                    print(client3_model)
+                if data[0]==0xDA:
+                    print('##')
+                    client4_model = pickle.loads(data[1:])
+                    print('#client 4 model#')
+                    print(client4_model)
+                if data[0]==0xEA:
+                    print('##')
+                    client5_model = pickle.loads(data[1:])
+                    print('#client 5 model#')
+                    print(client5_model)
+            x=x+1
+        aggregated_model = aggregation_function(client1_model, client2_model, client3_model, client4_model, client5_model)
+        print("#Global Model#")
+        print(aggregated_model)
+        aggregated_model = pickle.dumps(aggregated_model)
+        aggregated_model = b'\xcc'+aggregated_model
+        print("send global model")
+        server_socket.sendto(aggregated_model, client1_conf)
+        server_socket.sendto(aggregated_model, client2_conf)
+        server_socket.sendto(aggregated_model, client3_conf)
+        server_socket.sendto(aggregated_model, client4_conf)
+        server_socket.sendto(aggregated_model, client5_conf)
+        rounds += 1
+    print("FIN")
+if __name__ == "__main__":
+    main()
